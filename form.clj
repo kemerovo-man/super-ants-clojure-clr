@@ -138,11 +138,9 @@
 					(reset! buf-graph (render-lens))))))))
 					
 	(doto world-timer
-		(.set_Interval 5000)
+		(.set_Interval 1000)
 		(.set_Enabled true)
 		(.add_Tick (gen-delegate EventHandler [sender args]
-			(evaporate)
-			(herb-grow)
 			(swap! world-time inc)
 			(chart-update))))			
 					
@@ -151,7 +149,7 @@
 		(.Add chart1))
 	(doto form
 		(.set_ClientSize (Size. (* size 2)  size))
-		(.set_Text "Form1"))
+		(.set_Text "Super Ants"))
 	form))
 
 (defn init-winforms-app []

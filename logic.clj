@@ -1,4 +1,7 @@
 ;---------------------------------------- LOGIC ---------------------------------------------
+(defn sleep [ms] 
+	(. System.Threading.Thread (Sleep ms))) 	
+
 (def world-time (atom 0))
 
 (defstruct bug :type :dir)
@@ -42,24 +45,25 @@
 (defn create-ladybug [loc dir]
 	(create-bug loc :ladybug dir))
 	
-(defn bug-type? [bug type]
+(defn bug-typed [bug type]
 	(if bug
-		(if (= (:type bug) type) true false)))		
+		(if (= (:type bug) type) bug nil)))		
 	
 (defn aphis? [bug]
-	(bug-type? bug :aphis))
+	(bug-typed bug :aphis))
 
 (defn ant? [bug]
-	(bug-type? bug :ant))
+	(bug-typed bug :ant))
 
 (defn ladybug? [bug]
-	(bug-type? bug :ladybug))	
+	(bug-typed bug :ladybug))	
 		
 (defn setup []
 	(doall
 		(for [x anthill-range y anthill-range]
 			(dosync
 				(alter (place [x y]) assoc :anthill true))))
+				
 	(dosync 
 		(let [
 			aphises (doall 
@@ -221,20 +225,30 @@
 								:bug (dissoc ant :sugar))))
 	loc))
 
-(defn evaporate []
-	(dorun 
-		(for [x (range dim) y (range dim)]
+	
+(def world-update-agent (agent [0 0]))
+(defn world-update [loc]
+	(sleep 1)
+	(send *agent* world-update)
+	(let [p (place loc)
+			x (first loc)
+			y (second loc)
+			inc-x? (< x (dec dim))
+			inc-y? (and (not inc-x?) (< y (dec dim)))
+			reset? (and (= x (dec dim)) (= y (dec dim)))]
 			(dosync 
-				(let [p (place [x y])]
-				(alter p assoc :pher (Math/Round (* evap-rate (:pher @p)) 3)))))))
-
+				(alter p assoc :pher (Math/Round (* evap-rate (:pher @p)) 3))
+				(when (and (not (or (:anthill @p) (pos? (:sugar @p)))) (< (:herb @p) herb-scale) (chance? 100))
+					(alter p assoc :herb (+ (:herb @p) (rand-int herb-scale)))))
+			(if reset? 
+				[0 0]
+				[(if inc-x? (inc x) 0) (if inc-y? (inc y) y)])))
+		
 (defn herb-grow []
-	(doall 
-		(for [x (range dim) y (range dim)]
-			(let [p (place [x y])]
-				(when (and (chance? 10) (not (or (:anthill @p) (pos? (:sugar @p)))) (< (:herb @p) herb-scale))
-					(dosync 
-						(alter p assoc :herb (+ (:herb @p) (rand-int herb-scale)))))))))
+	(let [p (place [(rand-int dim) (rand-int dim)])]
+		(when (and (not (or (:anthill @p) (pos? (:sugar @p)))) (< (:herb @p) herb-scale))
+			(dosync 
+				(alter p assoc :herb (+ (:herb @p) (rand-int herb-scale)))))))
 
 (defn aphis-eggs? [pos]
 	(if (:aphis-eggs @pos) true false))
@@ -252,35 +266,42 @@
 				(if (= @x loc) true false))
 			@aphises)))
 
-(defn sleep [ms] 
-	(. System.Threading.Thread (Sleep ms))) 	
 
-(defn ant-sleep [] 
-	(sleep (+ 50 (rand-int @ant-sleep-ms)))) 
 
-(defn ladybug-sleep [] 
-	(sleep (+ 50 (rand-int @ladybug-sleep-ms)))) 	
-	
-(defn aphis-sleep [] 
-	(sleep (+ 50 (rand-int @aphis-sleep-ms)))) 	
+(defn bug-sleep [type]
+	(let [ms 
+		(cond (= type :ant)
+						@ant-sleep-ms
+				 (= type :aphis)	
+						@aphis-sleep-ms
+			     (= type :ladybug)	
+						@ladybug-sleep-ms
+				:else 0)]
+		(sleep (+ 50 (rand-int ms)))))	
 
 (defn get-around [loc by] 
 	(do (turn-disor loc (* by 1))
-				(ant-sleep)
+				;(bug-sleep :ant)
 				(let [tmp-loc (move loc)
 					  tmp-turn (turn-disor tmp-loc (* by -2))]
-				(ant-sleep)
+				;(bug-sleep :ant)
 				(let [tmp2-loc (move tmp-loc)]
-					(ant-sleep)
+					;(bug-sleep :ant)
 					(turn-disor tmp2-loc (* by 1))
 					tmp2-loc))))	
 					
-(defn pher-on-the-way? [p ahead ahead-left ahead-right vector]
-	(let [pher-power 20] 
-		(and (> (* (vector 0) (:pher @p)) (* pher-power (vector 0)))
-			 (> (* (vector 1) (:pher @ahead)) (* pher-power (vector 1)))
-			 (> (* (vector 2) (:pher @ahead-left)) (* pher-power (vector 2)))
-			 (> (* (vector 3) (:pher @ahead-right)) (* pher-power (vector 3))))))	
+(defn pher-on-the-way? [loc v]
+	(let [pher-power 20
+		p (place loc)
+		bug (:bug @p)
+		dir (:dir bug)
+		ahead (ahead loc dir)
+		ahead-left (ahead-left loc dir)
+		ahead-right (ahead-right loc dir)]
+		(and (> (* (v 0) (:pher @p)) (* pher-power (v 0)))
+			 (> (* (v 1) (:pher @ahead)) (* pher-power (v 1)))
+			 (> (* (v 2) (:pher @ahead-left)) (* pher-power (v 2)))
+			 (> (* (v 3) (:pher @ahead-right)) (* pher-power (v 3))))))	
 
 
 (defn aphises-born []
@@ -306,5 +327,4 @@
 								(create-aphis (delta-loc loc (dec dir)) (rand-dir)))
 						  (when-not (block? ahead-right) 
 								(create-aphis (delta-loc loc (inc dir)) (rand-dir)))))))))))
-					
-					
+				
