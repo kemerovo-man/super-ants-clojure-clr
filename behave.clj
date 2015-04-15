@@ -1,17 +1,73 @@
 ;---------------------------------------- BEHAVE ---------------------------------------------
-	
-(defn block-ahead [loc ahead ahead-left ahead-right] 
+(defn go-around [loc side] 
 	(let 
-		[block-ahead? (block? ahead)
+		[p (place loc)
+		 bug (:bug @p)
+		 dir (:dir bug)
+		 tmp-dir (if (= side :left)
+						(bound 8 (+ (:dir bug) 1))
+						(bound 8 (+ (:dir bug) -1)))]
+		(alter p assoc :bug 
+							(assoc bug :go-around 
+												{:from loc
+ 												  :to (delta-loc (delta-loc loc dir) dir)
+												  :dir dir
+												  :tmp-dir tmp-dir})))
+	(if (= side :left) 
+		(turn-disor loc -1)
+		(turn-disor loc 1)))
+
+(defn block-ahead [loc] 
+	(let 
+		[p (place loc)
+		 bug (:bug @p)
+		 dir (:dir bug)
+		 ahead (ahead loc dir)
+		 ahead-left (ahead-left loc dir)
+		 ahead-right (ahead-right loc dir)
+		 block-ahead? (block? ahead)
 		 block-ahead-left? (block? ahead-left)
 		 block-ahead-right? (block? ahead-right)]
 	(when block-ahead?
 		(cond
 			(not block-ahead-left?)
-				(get-around loc -1)  
+				(go-around loc :left)  
 			(not block-ahead-right?)
-				(get-around loc 1)   
+				(go-around loc :right)   
 			:else (turn-disor loc (rand-dir))))))
+
+(defn reset-go-around [bug go-around]
+	(let [b (assoc bug :dir (:dir go-around))]	
+		(dissoc b :go-around)))
+
+(defn go-around-step [loc]
+	(let [p (place loc)
+		bug (:bug @p)
+		dir (:dir bug)
+		ahead (ahead loc dir)
+		go-around (:go-around bug)	]
+	(cond
+		(and (= loc (:from go-around)) (block? ahead))
+			(do
+				 (alter p assoc :bug (reset-go-around bug go-around))
+				loc)
+		(and (= loc (:from go-around)) (not (block? ahead)))
+			(move loc)
+		(and (not (= loc (:from go-around))) (not (= loc (:to go-around))) (not (= dir (:tmp-dir go-around))))							
+			(do
+				(alter p assoc :bug 
+									(assoc bug :dir (:tmp-dir go-around)))
+				loc)
+		(and (not (= loc (:from go-around))) (not (= loc (:to go-around))) (= dir (:tmp-dir go-around)) (block? ahead))
+			(do 
+				(alter p assoc :bug (reset-go-around bug go-around))
+				loc)
+		(and (not (= loc (:from go-around))) (not (= loc (:to go-around))) (= dir (:tmp-dir go-around)) (not (block? ahead)))
+			(move loc)	
+		(and (= loc (:to go-around)) (not (= dir (:dir go-around))))							
+			(do 
+				(alter p assoc :bug (reset-go-around bug go-around))
+				loc))))	
 
 (defn cross-pheromon-road [loc] 
 	(let [tmp-loc (move loc)]
@@ -23,7 +79,7 @@
 	(let [tmp-loc (move loc)]
 		(if	(chance? 2)
 			(turn-disor tmp-loc (* -1 param))
-			(turn-disor tmp-loc (* 3 param)))))			
+			(turn-disor tmp-loc (* 3 param)))))					
 		
 (defn new-loc [loc]
 	(let [
@@ -45,12 +101,20 @@
 		aphis-ahead-right (if (aphis? bug-ahead-right) bug-ahead-right nil)
 		aphis-eggs-ahead (aphis-eggs? ahead)
 		aphis-eggs-ahead-left (aphis-eggs? ahead-left)
-		aphis-eggs-ahead-right (aphis-eggs? ahead-right)]
+		aphis-eggs-ahead-right (aphis-eggs? ahead-right)
+		go-around (:go-around bug)	]
 		(cond 
 			(= bug-type :ant)
 				(cond 
 					(and (:sugar ant) (:anthill @p)) 
 						(do (turn loc 4) (drop-sugar loc) loc)
+					(and (not (:sugar ant)) (pos? (:sugar @p)) (not (:anthill @p))) 
+						(do (turn-disor loc 4) (take-sugar loc) loc) 	
+					(block? ahead) 
+						(block-ahead loc)
+					go-around
+						(go-around-step loc)
+
 					(and  (:sugar ant) (< (:pher @p) 1000) (> (:pher @ahead) 1000) (chance? 2))
 						(let [tmp-loc (move loc)] (turn-disor tmp-loc 4) (drop-sugar tmp-loc) (move tmp-loc))
 					(and (:sugar ant) (:anthill @ahead))
@@ -59,18 +123,14 @@
 						(do (turn-disor loc -1) loc)
 					(and (:sugar ant) (:anthill @ahead-right))
 						(do (turn-disor loc 1) loc)
-						
-					(and (not (:sugar ant)) (pos? (:sugar @p)) (not (:anthill @p))) 
-						(do (turn-disor loc 4) (take-sugar loc) loc) 
+					
 					(and (not (:sugar ant)) (pos? (:sugar @ahead)) (not (:anthill @ahead)) (not bug-ahead))
 						(move loc)
 					(and (not (:sugar ant)) (pos? (:sugar @ahead-left)) (not (:anthill @ahead-left)))
 						(do (turn-disor loc -1) loc)
 					(and (not (:sugar ant)) (pos? (:sugar @ahead-right)) (not (:anthill @ahead-right)))
 						(do (turn-disor loc 1) loc)	
-						
-					(block? ahead) 
-						(block-ahead loc ahead ahead-left ahead-right)
+
 					(pher-on-the-way? loc [-1 -1 1 1])
 						(do (turn-disor loc -1) (let [tmp-loc (move loc)] (turn-disor tmp-loc -1) tmp-loc))
 					(pher-on-the-way? loc [1 1 1 1])
@@ -81,6 +141,7 @@
 						(cross-pheromon-road2 loc 1)
 					(pher-on-the-way? loc [-1 1 1 -1])
 						(cross-pheromon-road2 loc -1)
+						
 					(chance? 1000000)
 						(do (turn-disor loc (rand-dir)) loc)
 					:else (move loc))

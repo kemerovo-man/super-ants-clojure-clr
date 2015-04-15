@@ -196,15 +196,14 @@
 		  bug (:bug @old-p)
 		  new-loc (delta-loc loc (:dir bug))
 		  new-p (place new-loc)]
-	(dosync 
-		(if (not (block? new-p)) 
+	(if (not (block? new-p)) 
 			(do
 				(alter new-p assoc :bug bug)
 				(alter old-p dissoc :bug)
 				(when (ant? bug)
 					(move-ant bug new-p old-p))
 				new-loc)
-			loc))))
+			loc)))
 
 
 (defn take-sugar [loc]
@@ -279,16 +278,7 @@
 				:else 0)]
 		(sleep (+ 50 (rand-int ms)))))	
 
-(defn get-around [loc by] 
-	(do (turn-disor loc (* by 1))
-				;(bug-sleep :ant)
-				(let [tmp-loc (move loc)
-					  tmp-turn (turn-disor tmp-loc (* by -2))]
-				;(bug-sleep :ant)
-				(let [tmp2-loc (move tmp-loc)]
-					;(bug-sleep :ant)
-					(turn-disor tmp2-loc (* by 1))
-					tmp2-loc))))	
+
 					
 (defn pher-on-the-way? [loc v]
 	(let [pher-power 20
