@@ -64,7 +64,7 @@
 				loc)
 		(and (not (= loc (:from go-around))) (not (= loc (:to go-around))) (= dir (:tmp-dir go-around)) (not (block? ahead)))
 			(move loc)	
-		(and (= loc (:to go-around)) (not (= dir (:dir go-around))))							
+		(and (= loc (:to go-around)))							
 			(do 
 				(alter p assoc :bug (reset-go-around bug go-around))
 				loc))))	

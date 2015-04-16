@@ -8,7 +8,7 @@
 (def sugar-range 100)
 (def pher-scale 20.0)
 (def sugar-scale 30.0)
-(def herb-scale 3)
+(def herb-scale 10)
 (def evap-rate 0.8)
 (def animation-sleep-ms 50) 
 (def ant-sleep-ms (atom 200))

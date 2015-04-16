@@ -14,7 +14,8 @@
 (defn add-xy [series-name x y]
 	(let [series (get-series series-name)]
 	(when series
-		(.AddXY (.Points series) x y))))			
+		(.AddXY (.Points series) x y)
+		(when (> (.Count (.Points series)) 500) (.RemoveAt (.Points series) 0)))))			
 
 (defn create-series [chart]	
 	(let 
@@ -47,12 +48,18 @@
 		(.set_LegendText "Aphises")
 		)))  	
 
-(defn chart-update[]
+(defn chart-update[chart]
 	(add-xy "anthill-sugar" @world-time (anthill-sugar-calc))
 	(add-xy "herb" @world-time (herb-calc))
 	(add-xy "sugar" @world-time (free-sugar-calc))
-	(add-xy "aphises" @world-time (aphises-count))
-	)
+	(add-xy "aphises" @world-time (count @aphises))
+	
+	(let [chart-areas (. chart ChartAreas)
+		  chart-area (first chart-areas)
+		  axis-x (. chart-area AxisX)]
+		(doto axis-x 
+			(.set_Minimum (if (> @world-time 500) (- @world-time 500) 0))
+			(.set_Maximum (if (> @world-time 500) @world-time 500)))))
 		
 (defn create-form []
 	(let [form (Form.)
@@ -78,7 +85,7 @@
 		
 	(create-series chart1)
 	(reset! chart chart1)
-	(chart-update)
+	(chart-update chart1)
 	
 	(let [chart-areas (. chart1 ChartAreas)
 		  chart-area (first chart-areas)
@@ -138,11 +145,11 @@
 					(reset! buf-graph (render-lens))))))))
 					
 	(doto world-timer
-		(.set_Interval 1000)
+		(.set_Interval 5000)
 		(.set_Enabled true)
 		(.add_Tick (gen-delegate EventHandler [sender args]
 			(swap! world-time inc)
-			(chart-update))))			
+			(chart-update chart1))))			
 					
 	(doto (.Controls form)
 		(.Add panel)
