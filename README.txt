@@ -12,3 +12,5 @@ Installation Super Ants
 Or create shortcut with follow property "C:\clojure-clr\Clojure.Main.exe" "C:\super-ants\start.clj"
 Modify paths.
 6. Enjoy!
+
+https://youtu.be/xZ9AGQ3L-EI
